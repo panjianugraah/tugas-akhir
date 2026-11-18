@@ -8,15 +8,13 @@ use App\Models\Kelas;
 use App\Models\PeriodePpdb;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
         $filter = $request->validate([
-            'periode_ppdb_id' =>
-                'nullable|integer|exists:periode_ppdb,id',
+            'periode_ppdb_id' => 'nullable|integer|exists:periode_ppdb,id',
         ]);
 
         $periode = PeriodePpdb::query()
@@ -86,7 +84,7 @@ class DashboardController extends Controller
                 ];
             });
 
-        return Inertia::render('admin/dashboard', [
+        return view('pages.admin.dashboard', [
             'ringkasan' => [
                 'siswa_aktif' => Siswa::where('status', 'aktif')->count(),
                 'guru_aktif' => Guru::where('status', 'aktif')->count(),

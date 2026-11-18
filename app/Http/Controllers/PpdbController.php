@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Siswa;
 use App\Models\DataPpdb;
 use App\Models\PeriodePpdb;
+use App\Models\Siswa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -15,8 +15,8 @@ class PpdbController extends Controller
     public function list(Request $request)
     {
         $ppdb = DataPpdb::query()
-            ->when($request->status, fn($q, $status) => $q->where('status', $status))
-            ->when($request->search, fn($q, $search) => $q->where(function ($qq) use ($search) {
+            ->when($request->status, fn ($q, $status) => $q->where('status', $status))
+            ->when($request->search, fn ($q, $search) => $q->where(function ($qq) use ($search) {
                 $qq->where('nama_lengkap', 'like', "%{$search}%")
                     ->orWhere('nisn', 'like', "%{$search}%");
             }))
@@ -25,8 +25,8 @@ class PpdbController extends Controller
 
         return response()->json([
             'success' => true,
-            'total'   => $ppdb->count(),
-            'data'    => $ppdb,
+            'total' => $ppdb->count(),
+            'data' => $ppdb,
         ]);
     }
 
@@ -35,7 +35,7 @@ class PpdbController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => $ppdb,
+            'data' => $ppdb,
         ]);
     }
 
@@ -43,8 +43,7 @@ class PpdbController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'periode_ppdb_id' =>
-            'required|integer|exists:periode_ppdb,id',
+            'periode_ppdb_id' => 'required|integer|exists:periode_ppdb,id',
 
             'nama_lengkap' => 'required|string|max:255',
             'nisn' => 'required|digits:10|unique:data_ppdb,nisn',
@@ -74,8 +73,7 @@ class PpdbController extends Controller
 
         if (! $periode) {
             throw ValidationException::withMessages([
-                'periode_ppdb_id' =>
-                'Periode pendaftaran belum dibuka atau sudah ditutup.',
+                'periode_ppdb_id' => 'Periode pendaftaran belum dibuka atau sudah ditutup.',
             ]);
         }
 
@@ -85,7 +83,7 @@ class PpdbController extends Controller
         // Kuota tidak diperiksa karena hanya sebagai informasi.
         $ppdb = DataPpdb::create($data);
 
-        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+        if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => 'Pendaftaran berhasil dikirim.',
@@ -151,7 +149,7 @@ class PpdbController extends Controller
 
                 $tahun = now()->format('y');
 
-                $nis = $tahun . str_pad(
+                $nis = $tahun.str_pad(
                     (string) $idPendaftar,
                     4,
                     '0',

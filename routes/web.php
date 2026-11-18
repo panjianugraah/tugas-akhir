@@ -14,7 +14,6 @@ use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\SiswaController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,28 +30,26 @@ Route::pattern('repository', '[0-9]+');
 |--------------------------------------------------------------------------
 */
 
-Route::inertia('/', 'welcome')
+Route::view('/', 'pages.public.home')
     ->name('home');
 
-Route::inertia('/ppdb', 'ppdb')
+Route::view('/ppdb', 'pages.public.ppdb')
     ->name('ppdb');
 
-Route::inertia('/ppdb/formppdb', 'formppdb')
+Route::view('/ppdb/formppdb', 'pages.public.formppdb')
     ->name('formppdb');
 
-Route::inertia('/pengumuman', 'pengumuman-umum')
+Route::view('/pengumuman', 'pages.public.pengumuman.index')
     ->name('pengumuman.publik.index');
 
 Route::get('/pengumuman/{slug}', function (string $slug) {
-    return Inertia::render('pengumuman-umum-detail', [
-        'slug' => $slug,
-    ]);
+    return view('pages.public.pengumuman.detail', ['slug' => $slug]);
 })->name('pengumuman.publik.show');
 
-Route::inertia('/galeri', 'galeri-umum')
+Route::view('/galeri', 'pages.public.galeri')
     ->name('galeri.publik');
 
-Route::inertia('/repository', 'repository-umum')
+Route::view('/repository', 'pages.public.repository')
     ->name('repository.publik');
 
 /*
@@ -139,9 +136,9 @@ Route::get('/dashboard', function (Request $request) {
 */
 
 Route::middleware('auth')->group(function () {
-    Route::inertia(
+    Route::view(
         '/admin/konten/repository',
-        'admin/repository'
+        'pages.admin.repository'
     )->name('admin.konten.repository');
 
     Route::redirect(
@@ -195,7 +192,7 @@ Route::middleware(['auth', 'verified', 'can:access-admin'])
         ])->name('dashboard');
 
         // Laporan.
-        Route::inertia('laporan', 'admin/laporan')
+        Route::view('laporan', 'pages.admin.laporan')
             ->name('laporan');
 
         Route::get('laporan/ppdb/pdf', [
@@ -214,31 +211,31 @@ Route::middleware(['auth', 'verified', 'can:access-admin'])
         ])->name('laporan.guru.pdf');
 
         // Data akademik.
-        Route::inertia('siswa', 'admin/siswa')
+        Route::view('siswa', 'pages.admin.siswa')
             ->name('siswa');
 
-        Route::inertia('guru', 'admin/guru')
+        Route::view('guru', 'pages.admin.guru')
             ->name('guru');
 
-        Route::inertia('kelas', 'admin/kelas')
+        Route::view('kelas', 'pages.admin.kelas')
             ->name('kelas');
 
-        Route::inertia('mata-pelajaran', 'admin/mata-pelajaran')
+        Route::view('mata-pelajaran', 'pages.admin.mata-pelajaran')
             ->name('mata-pelajaran');
 
         // PPDB.
-        Route::inertia('ppdbadmin', 'admin/ppdbadmin')
+        Route::view('ppdbadmin', 'pages.admin.ppdbadmin')
             ->name('ppdb');
 
-        Route::inertia('periode-ppdb', 'admin/periode-ppdb')
+        Route::view('periode-ppdb', 'pages.admin.periode-ppdb')
             ->name('periode-ppdb');
 
         // Konten selain repository.
         Route::prefix('konten')->name('konten.')->group(function () {
-            Route::inertia('pengumuman', 'admin/pengumuman')
+            Route::view('pengumuman', 'pages.admin.pengumuman')
                 ->name('pengumuman');
 
-            Route::inertia('galeri', 'admin/galeri')
+            Route::view('galeri', 'pages.admin.galeri')
                 ->name('galeri');
         });
 
@@ -357,4 +354,4 @@ Route::middleware('auth')->prefix('api')->group(function () {
         ->parameters(['repository' => 'repository']);
 });
 
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';

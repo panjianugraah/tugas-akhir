@@ -7,13 +7,12 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
-use Inertia\Inertia;
 
 class PenggunaController extends Controller
 {
     public function create()
     {
-        return Inertia::render('admin/tambah-pengguna');
+        return view('pages.admin.tambah-pengguna');
     }
 
     public function store(Request $request)
