@@ -1,0 +1,195 @@
+Project SIANGKASA {
+  database_type: 'MySQL'
+  Note: 'PDM 11 tabel utama sesuai dump SQL 3 November 2026.'
+}
+
+Enum guru_jenis_kelamin {
+  L
+  P
+}
+
+Enum guru_status {
+  aktif
+  nonaktif
+}
+
+Enum data_ppdb_jenis_kelamin {
+  L
+  P
+}
+
+Enum data_ppdb_status {
+  menunggu
+  diterima
+  ditolak
+}
+
+Enum siswa_jenis_kelamin {
+  L
+  P
+}
+
+Enum siswa_status {
+  aktif
+  lulus
+  pindah
+  keluar
+}
+
+Enum pengumuman_status {
+  draft
+  terbit
+}
+
+Table users {
+  id "bigint unsigned" [pk, increment, not null]
+  name varchar(255) [not null]
+  email varchar(255) [not null, unique]
+  email_verified_at timestamp [null, default: null]
+  password varchar(255) [not null]
+  two_factor_secret text [null, default: null]
+  two_factor_recovery_codes text [null, default: null]
+  two_factor_confirmed_at timestamp [null, default: null]
+  remember_token varchar(100) [null, default: null]
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+}
+
+Table mata_pelajaran {
+  id "bigint unsigned" [pk, increment, not null]
+  nama varchar(100) [not null, unique]
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+}
+
+Table guru {
+  id "bigint unsigned" [pk, increment, not null]
+  nip varchar(18) [null, unique, default: null]
+  nama_lengkap varchar(255) [not null]
+  jenis_kelamin guru_jenis_kelamin [not null]
+  tempat_lahir varchar(100) [not null]
+  tanggal_lahir date [not null]
+  mata_pelajaran varchar(255) [null, default: null]
+  no_hp varchar(20) [not null]
+  email varchar(255) [null, unique, default: null]
+  alamat text [not null]
+  status guru_status [not null, default: 'aktif']
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+  mata_pelajaran_id "bigint unsigned" [null, default: null, note: 'FK']
+}
+
+Table kelas {
+  id "bigint unsigned" [pk, increment, not null]
+  nama_kelas varchar(50) [not null]
+  tingkat "tinyint unsigned" [not null]
+  tahun_ajaran varchar(9) [not null]
+  kapasitas "int unsigned" [not null, default: 32]
+  wali_kelas_id "bigint unsigned" [null, default: null, note: 'FK']
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+  indexes {
+    (nama_kelas, tahun_ajaran) [unique]
+  }
+}
+
+Table periode_ppdb {
+  id "bigint unsigned" [pk, increment, not null]
+  nama_periode varchar(150) [not null]
+  tanggal_mulai datetime [not null]
+  tanggal_selesai datetime [not null]
+  kuota "int unsigned" [null, default: null]
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+}
+
+Table data_ppdb {
+  id "bigint unsigned" [pk, increment, not null]
+  nama_lengkap varchar(255) [not null]
+  nisn varchar(10) [not null, unique]
+  jenis_kelamin data_ppdb_jenis_kelamin [not null]
+  tempat_lahir varchar(255) [not null]
+  tanggal_lahir date [not null]
+  asal_sekolah varchar(255) [not null]
+  nama_orang_tua varchar(255) [not null]
+  no_hp varchar(20) [not null]
+  email varchar(255) [null, default: null]
+  alamat text [not null]
+  status data_ppdb_status [not null, default: 'menunggu']
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+  periode_ppdb_id "bigint unsigned" [null, default: null, note: 'FK']
+}
+
+Table siswa {
+  id "bigint unsigned" [pk, increment, not null]
+  ppdb_id "bigint unsigned" [null, unique, default: null, note: 'FK']
+  kelas_id "bigint unsigned" [null, default: null, note: 'FK']
+  nis varchar(20) [not null, unique]
+  nisn varchar(10) [not null, unique]
+  nama_lengkap varchar(255) [not null]
+  jenis_kelamin siswa_jenis_kelamin [not null]
+  tempat_lahir varchar(100) [not null]
+  tanggal_lahir date [not null]
+  nama_orang_tua varchar(255) [not null]
+  no_hp varchar(20) [not null]
+  email varchar(255) [null, default: null]
+  alamat text [not null]
+  status siswa_status [not null, default: 'aktif']
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+}
+
+Table pengumuman {
+  id "bigint unsigned" [pk, increment, not null]
+  judul varchar(255) [not null]
+  slug varchar(255) [not null, unique]
+  isi longtext [not null]
+  gambar varchar(255) [null, default: null]
+  berlaku_sampai date [null, default: null]
+  status pengumuman_status [not null, default: 'draft']
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+  created_by "bigint unsigned" [null, default: null, note: 'FK']
+}
+
+Table galeri {
+  id "bigint unsigned" [pk, increment, not null]
+  gambar varchar(255) [not null]
+  deskripsi varchar(255) [null, default: null]
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+  created_by "bigint unsigned" [null, default: null, note: 'FK']
+}
+
+Table repository {
+  id "bigint unsigned" [pk, increment, not null]
+  judul varchar(255) [not null]
+  deskripsi text [null, default: null]
+  path varchar(255) [null, default: null]
+  nama_file varchar(255) [not null]
+  ekstensi varchar(10) [not null]
+  ukuran "bigint unsigned" [not null]
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+  mata_pelajaran_id "bigint unsigned" [null, default: null, note: 'FK']
+  created_by "bigint unsigned" [null, default: null, note: 'FK']
+}
+
+Table repository_settings {
+  id "bigint unsigned" [pk, increment, not null]
+  kode_akses varchar(100) [not null]
+  versi "int unsigned" [not null, default: 1]
+  created_at timestamp [null, default: null]
+  updated_at timestamp [null, default: null]
+}
+
+Ref: guru.mata_pelajaran_id > mata_pelajaran.id [delete: set null]
+Ref: kelas.wali_kelas_id > guru.id [delete: set null]
+Ref: data_ppdb.periode_ppdb_id > periode_ppdb.id [delete: restrict]
+Ref: siswa.kelas_id > kelas.id [delete: set null]
+Ref: siswa.ppdb_id - data_ppdb.id [delete: set null]
+Ref: pengumuman.created_by > users.id [delete: set null]
+Ref: galeri.created_by > users.id [delete: set null]
+Ref: repository.mata_pelajaran_id > mata_pelajaran.id [delete: set null]
+Ref: repository.created_by > users.id [delete: set null]

@@ -1,0 +1,150 @@
+// PDM perkiraan dari model dan controller; cocokkan dengan MySQL.
+Table users {
+  id bigint [pk]
+  name varchar
+  email varchar
+  email_verified_at datetime
+  password varchar
+  two_factor_secret text
+  two_factor_recovery_codes text
+  two_factor_confirmed_at datetime
+  remember_token varchar
+  created_at datetime
+  updated_at datetime
+}
+
+Table mata_pelajaran {
+  id bigint [pk]
+  nama varchar
+  created_at datetime
+  updated_at datetime
+}
+
+Table guru {
+  id bigint [pk]
+  nip varchar
+  nama_lengkap varchar
+  jenis_kelamin varchar
+  tempat_lahir varchar
+  tanggal_lahir date
+  mata_pelajaran varchar
+  no_hp varchar
+  email varchar
+  alamat text
+  status varchar
+  mata_pelajaran_id bigint
+  created_at datetime
+  updated_at datetime
+}
+
+Table kelas {
+  id bigint [pk]
+  nama_kelas varchar
+  tingkat int
+  tahun_ajaran varchar
+  kapasitas int
+  wali_kelas_id bigint
+  created_at datetime
+  updated_at datetime
+}
+
+Table periode_ppdb {
+  id bigint [pk]
+  nama_periode varchar
+  tanggal_mulai datetime
+  tanggal_selesai datetime
+  kuota int
+  created_at datetime
+  updated_at datetime
+}
+
+Table data_ppdb {
+  id bigint [pk]
+  periode_ppdb_id bigint
+  nama_lengkap varchar
+  nisn varchar
+  jenis_kelamin varchar
+  tempat_lahir varchar
+  tanggal_lahir date
+  asal_sekolah varchar
+  nama_orang_tua varchar
+  no_hp varchar
+  email varchar
+  alamat text
+  status varchar
+  created_at datetime
+  updated_at datetime
+}
+
+Table siswa {
+  id bigint [pk]
+  ppdb_id bigint
+  kelas_id bigint
+  nis varchar
+  nisn varchar
+  nama_lengkap varchar
+  jenis_kelamin varchar
+  tempat_lahir varchar
+  tanggal_lahir date
+  nama_orang_tua varchar
+  no_hp varchar
+  email varchar
+  alamat text
+  status varchar
+  created_at datetime
+  updated_at datetime
+}
+
+Table pengumuman {
+  id bigint [pk]
+  judul varchar
+  slug varchar
+  isi text
+  gambar varchar
+  berlaku_sampai date
+  status varchar
+  created_by bigint
+  created_at datetime
+  updated_at datetime
+}
+
+Table galeri {
+  id bigint [pk]
+  gambar varchar
+  deskripsi text
+  created_by bigint
+  created_at datetime
+  updated_at datetime
+}
+
+Table repository {
+  id bigint [pk]
+  mata_pelajaran_id bigint
+  judul varchar
+  deskripsi text
+  path varchar
+  nama_file varchar
+  ekstensi varchar
+  ukuran bigint
+  created_by bigint
+  created_at datetime
+  updated_at datetime
+}
+
+Table repository_settings {
+  id bigint [pk]
+  kode_akses varchar
+  versi int
+  created_at datetime
+  updated_at datetime
+}
+
+Ref: guru.mata_pelajaran_id > mata_pelajaran.id
+Ref: kelas.wali_kelas_id > guru.id
+Ref: siswa.kelas_id > kelas.id
+Ref: data_ppdb.periode_ppdb_id > periode_ppdb.id
+Ref: siswa.ppdb_id - data_ppdb.id
+Ref: pengumuman.created_by > users.id
+Ref: galeri.created_by > users.id
+Ref: repository.created_by > users.id
+Ref: repository.mata_pelajaran_id > mata_pelajaran.id
