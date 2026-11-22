@@ -1,14 +1,12 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    RewriteCond %{REQUEST_FILENAME} -d [OR]
-    RewriteCond %{REQUEST_FILENAME} -f
-    RewriteRule ^ ^$1 [N]
+    # Lindungi file konfigurasi dan folder Git
+    RewriteRule ^(?:\.env|\.git(?:/|$)) - [F,L,NC]
 
-    RewriteCond %{REQUEST_URI} (\.\w+$) [NC]
-    RewriteRule ^(.*)$ public/$1
+    # Jangan rewrite ulang path yang sudah berada di folder public⏎
+    RewriteRule ^public(?:/|$) - [L]
 
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^ index.php
+    # Arahkan seluruh request subdomain ke folder public Laravel⏎
+    RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
