@@ -39,6 +39,20 @@ class AppServiceProvider extends ServiceProvider
                 true
             );
         });
+
+        // Kepala sekolah: hanya melihat (monitoring) dashboard, data, dan laporan.
+        Gate::define('kepala-sekolah', function (User $user) {
+            return in_array(
+                (string) $user->id,
+                config('access.kepala_sekolah_user_ids', []),
+                true
+            );
+        });
+
+        // Halaman monitoring dapat dibuka admin maupun kepala sekolah.
+        Gate::define('view-monitoring', function (User $user) {
+            return Gate::forUser($user)->any(['access-admin', 'kepala-sekolah']);
+        });
         $this->configureDefaults();
     }
 

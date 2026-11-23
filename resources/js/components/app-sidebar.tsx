@@ -71,14 +71,19 @@ export function AppSidebar() {
         can: {
             access_admin: boolean;
             manage_users: boolean;
+            view_monitoring: boolean;
+            kepala_sekolah: boolean;
         };
     }>().props;
 
+    // Kepala sekolah: menu monitoring saja (tanpa Pengelolaan Konten).
     const visibleNavItems = can.access_admin
         ? mainNavItems
-        : mainNavItems.filter(
-            (item) => item.href === '/admin/konten/repository'
-        );
+        : can.view_monitoring
+            ? mainNavItems.filter((item) => item.title !== 'Pengelolaan Konten')
+            : mainNavItems.filter(
+                (item) => item.href === '/admin/konten/repository'
+            );
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -88,7 +93,7 @@ export function AppSidebar() {
                         <SidebarMenuButton size="lg" asChild className='h-14 group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:p-1!' >
                             <Link
                                 href={
-                                    can.access_admin
+                                    can.view_monitoring
                                         ? '/admin/dashboard'
                                         : '/admin/konten/repository'
                                 }
