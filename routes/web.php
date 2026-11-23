@@ -125,7 +125,7 @@ Route::prefix('api/repository')->group(function () {
 
 Route::get('/dashboard', function (Request $request) {
     return redirect(
-        $request->user()->can('access-admin')
+        $request->user()->can('view-monitoring')
             ? '/admin/dashboard'
             : '/admin/konten/repository'
     );
@@ -181,11 +181,13 @@ Route::middleware(['auth', 'can:manage-users'])
 
 /*
 |--------------------------------------------------------------------------
-| Halaman Dashboard dan Pengelolaan Khusus Admin
+| Halaman Monitoring: Admin dan Kepala Sekolah
 |--------------------------------------------------------------------------
+| Kepala sekolah hanya dapat melihat. Seluruh perubahan data tetap
+| dijaga oleh endpoint JSON khusus admin di bawah.
 */
 
-Route::middleware(['auth', 'verified', 'can:access-admin'])
+Route::middleware(['auth', 'verified', 'can:view-monitoring'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -232,7 +234,18 @@ Route::middleware(['auth', 'verified', 'can:access-admin'])
 
         Route::inertia('periode-ppdb', 'admin/periode-ppdb')
             ->name('periode-ppdb');
+    });
 
+/*
+|--------------------------------------------------------------------------
+| Halaman Pengelolaan Konten: Khusus Admin
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'verified', 'can:access-admin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
         // Konten selain repository.
         Route::prefix('konten')->name('konten.')->group(function () {
             Route::inertia('pengumuman', 'admin/pengumuman')
@@ -248,6 +261,46 @@ Route::middleware(['auth', 'verified', 'can:access-admin'])
 
 /*
 |--------------------------------------------------------------------------
+| Endpoint JSON Baca-Saja: Admin dan Kepala Sekolah
+|--------------------------------------------------------------------------
+| Dipakai halaman monitoring dan laporan. Tidak ada endpoint tulis di sini.
+*/
+
+Route::middleware(['auth', 'can:view-monitoring'])
+    ->prefix('api')
+    ->group(function () {
+        Route::apiResource('siswa', SiswaController::class)
+            ->parameters(['siswa' => 'siswa'])
+            ->only(['index', 'show']);
+
+        Route::apiResource('guru', GuruController::class)
+            ->parameters(['guru' => 'guru'])
+            ->only(['index', 'show']);
+
+        Route::apiResource('kelas', KelasController::class)
+            ->parameters(['kelas' => 'kelas'])
+            ->only(['index', 'show']);
+
+        Route::get('ppdb', [
+            PpdbController::class,
+            'list',
+        ]);
+
+        Route::get('ppdb/{ppdb}', [
+            PpdbController::class,
+            'show',
+        ]);
+
+        Route::apiResource(
+            'periode-ppdb',
+            PeriodePpdbController::class
+        )
+            ->parameters(['periode-ppdb' => 'periodePpdb'])
+            ->only(['index', 'show']);
+    });
+
+/*
+|--------------------------------------------------------------------------
 | Endpoint JSON Khusus Admin
 |--------------------------------------------------------------------------
 | Menjaga keamanan CRUD, bukan hanya menyembunyikan menu sidebar.
@@ -258,13 +311,16 @@ Route::middleware(['auth', 'can:access-admin'])
     ->group(function () {
         // Akademik.
         Route::apiResource('siswa', SiswaController::class)
-            ->parameters(['siswa' => 'siswa']);
+            ->parameters(['siswa' => 'siswa'])
+            ->except(['index', 'show']);
 
         Route::apiResource('guru', GuruController::class)
-            ->parameters(['guru' => 'guru']);
+            ->parameters(['guru' => 'guru'])
+            ->except(['index', 'show']);
 
         Route::apiResource('kelas', KelasController::class)
-            ->parameters(['kelas' => 'kelas']);
+            ->parameters(['kelas' => 'kelas'])
+            ->except(['index', 'show']);
 
         // Index mapel sudah tersedia untuk semua akun login.
         // Perubahannya hanya boleh dilakukan admin.
@@ -276,16 +332,6 @@ Route::middleware(['auth', 'can:access-admin'])
             ->only(['store', 'update', 'destroy']);
 
         // Pengelolaan PPDB, bukan pendaftaran publik.
-        Route::get('ppdb', [
-            PpdbController::class,
-            'list',
-        ]);
-
-        Route::get('ppdb/{ppdb}', [
-            PpdbController::class,
-            'show',
-        ]);
-
         Route::put('ppdb/{ppdb}', [
             PpdbController::class,
             'update',
@@ -309,7 +355,9 @@ Route::middleware(['auth', 'can:access-admin'])
         Route::apiResource(
             'periode-ppdb',
             PeriodePpdbController::class
-        )->parameters(['periode-ppdb' => 'periodePpdb']);
+        )
+            ->parameters(['periode-ppdb' => 'periodePpdb'])
+            ->except(['index', 'show']);
 
         // Pengumuman.
         Route::apiResource(

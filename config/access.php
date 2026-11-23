@@ -1,11 +1,14 @@
 <?php
 
+$parseIds = fn (string $value): array => array_values(array_filter(
+    array_map('trim', explode(',', $value)),
+    fn ($id) => $id !== ''
+));
+
 return [
-    'admin_user_ids' => array_values(array_filter(
-        array_map(
-            'trim',
-            explode(',', env('ADMIN_USER_IDS', ''))
-        ),
-        fn ($id) => $id !== ''
-    )),
+    // Akses penuh: kelola seluruh data.
+    'admin_user_ids' => $parseIds((string) env('ADMIN_USER_IDS', '')),
+
+    // Akses monitoring (hanya lihat): dashboard, data, dan laporan.
+    'kepala_sekolah_user_ids' => $parseIds((string) env('KEPALA_SEKOLAH_USER_IDS', '')),
 ];

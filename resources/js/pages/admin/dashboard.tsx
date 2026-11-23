@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     ClipboardList,
@@ -72,6 +72,8 @@ export default function Dashboard({
     siswaTanpaKelas,
 }: Props) {
     const [loadingFilter, setLoadingFilter] = useState(false);
+    const { can } = usePage<{ can?: { access_admin?: boolean } }>().props;
+    const isAdmin = Boolean(can?.access_admin);
 
     const namaPeriode =
         periode.find((item) => item.id === periodeTerpilih)?.nama_periode
@@ -142,7 +144,7 @@ export default function Dashboard({
 
     return (
         <>
-            <Head title="Dashboard Admin" />
+            <Head title={isAdmin ? 'Dashboard Admin' : 'Dashboard Kepala Sekolah'} />
 
             <main className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
@@ -355,7 +357,7 @@ export default function Dashboard({
                             href="/admin/ppdbadmin"
                             className="text-sm font-medium text-blue-700 hover:underline"
                         >
-                            Kelola PPDB →
+                            {isAdmin ? 'Kelola PPDB →' : 'Lihat PPDB →'}
                         </Link>
                     </div>
 

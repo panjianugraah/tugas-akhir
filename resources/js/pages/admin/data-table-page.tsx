@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
@@ -53,6 +53,11 @@ export default function DataTablePage({
     const [search, setSearch] = useState('');
     const q = search.toLowerCase();
 
+    // Kepala sekolah hanya memantau: tombol tambah/edit/hapus disembunyikan.
+    const { can } = usePage<{ can?: { access_admin?: boolean; kepala_sekolah?: boolean } }>().props;
+    const readOnly = Boolean(can?.kepala_sekolah && !can?.access_admin);
+    const totalKolom = columns.length + (readOnly ? 1 : 2);
+
     const filtered = rows.filter((row) =>
         columns
             .filter((col) => col.searchable !== false)
@@ -70,7 +75,7 @@ export default function DataTablePage({
                         <h1 className="text-2xl font-bold">{title}</h1>
                         {description && <p className="text-sm text-muted-foreground">{description}</p>}
                     </div>
-                    {addLabel && (
+                    {addLabel && !readOnly && (
                         <button
                             onClick={onAdd ?? (() => alert(`Form "${addLabel}" belum dibuat`))}
                             className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
@@ -103,14 +108,14 @@ export default function DataTablePage({
                                 {columns.map((col) => (
                                     <th key={col.key} className="p-3 font-semibold">{col.label}</th>
                                 ))}
-                                <th className="p-3 text-right">Aksi</th>
+                                {!readOnly && <th className="p-3 text-right">Aksi</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={columns.length + 2} className="p-6 text-center text-muted-foreground">Memuat data...</td></tr>
+                                <tr><td colSpan={totalKolom} className="p-6 text-center text-muted-foreground">Memuat data...</td></tr>
                             ) : filtered.length === 0 ? (
-                                <tr><td colSpan={columns.length + 2} className="p-6 text-center text-muted-foreground">Tidak ada data.</td></tr>
+                                <tr><td colSpan={totalKolom} className="p-6 text-center text-muted-foreground">Tidak ada data.</td></tr>
                             ) : (
                                 filtered.map((row, i) => (
                                     <tr key={row.id ?? i} className="border-t hover:bg-muted/30">
@@ -120,7 +125,7 @@ export default function DataTablePage({
                                                 {col.render ? col.render(row) : (get(row, col.key) ?? '-')}
                                             </td>
                                         ))}
-                                        <td className="p-3">
+                                        {!readOnly && <td className="p-3">
                                             <div className="flex justify-end gap-1">
                                                 {actions ? actions(row) : (
                                                     <>
@@ -133,7 +138,7 @@ export default function DataTablePage({
                                                     </>
                                                 )}
                                             </div>
-                                        </td>
+                                        </td>}
                                     </tr>
                                 ))
                             )}
