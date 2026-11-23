@@ -1,0 +1,626 @@
+From cf1fe2ae5834df052b2dc63fce41fbaa49331846 Mon Sep 17 00:00:00 2001
+From: maulanawirawan <maulanawirawan@users.noreply.github.com>
+Date: Mon, 23 Nov 2026 10:03:31 +0700
+Subject: [PATCH] feat: akun kepala sekolah untuk monitoring (read-only)
+
+- Seeder KepalaSekolahSeeder (kredensial dari env, tidak disimpan di repo)
+- Gate kepala-sekolah & view-monitoring; dashboard, data, laporan bisa dilihat
+- Endpoint tulis tetap khusus admin; tombol tambah/edit/hapus disembunyikan
+- Feature test KepalaSekolahAccessTest
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .env.example                                  |   3 +
+ app/Http/Middleware/HandleInertiaRequests.php |   2 +
+ app/Providers/AppServiceProvider.php          |  14 ++
+ config/access.php                             |  19 ++-
+ database/seeders/DatabaseSeeder.php           |   1 +
+ database/seeders/KepalaSekolahSeeder.php      |  71 +++++++++
+ resources/js/components/app-sidebar.tsx       |  13 +-
+ resources/js/pages/admin/dashboard.tsx        |   8 +-
+ resources/js/pages/admin/data-table-page.tsx  |  19 ++-
+ routes/web.php                                |  82 +++++++---
+ tests/Feature/KepalaSekolahAccessTest.php     | 141 ++++++++++++++++++
+ 11 files changed, 334 insertions(+), 39 deletions(-)
+ create mode 100644 database/seeders/KepalaSekolahSeeder.php
+ create mode 100644 tests/Feature/KepalaSekolahAccessTest.php
+
+diff --git a/.env.example b/.env.example
+index 40bb13b..c5b88a6 100644
+--- a/.env.example
++++ b/.env.example
+@@ -63,3 +63,6 @@ AWS_BUCKET=
+ AWS_USE_PATH_STYLE_ENDPOINT=false
+ 
+ VITE_APP_NAME="${APP_NAME}"
++
++# Akun monitoring kepala sekolah (diisi otomatis oleh KepalaSekolahSeeder)
++KEPALA_SEKOLAH_USER_IDS=
+diff --git a/app/Http/Middleware/HandleInertiaRequests.php b/app/Http/Middleware/HandleInertiaRequests.php
+index 47c3383..e0e4f57 100644
+--- a/app/Http/Middleware/HandleInertiaRequests.php
++++ b/app/Http/Middleware/HandleInertiaRequests.php
+@@ -41,6 +41,8 @@ public function share(Request $request): array
+             'can' => [
+                 'access_admin' => $request->user()?->can('access-admin') ?? false,
+                 'manage_users' => $request->user()?->can('manage-users') ?? false,
++                'view_monitoring' => $request->user()?->can('view-monitoring') ?? false,
++                'kepala_sekolah' => $request->user()?->can('kepala-sekolah') ?? false,
+             ],
+             'auth' => [
+                 'user' => $request->user(),
+diff --git a/app/Providers/AppServiceProvider.php b/app/Providers/AppServiceProvider.php
+index 8fc19e8..9233f79 100644
+--- a/app/Providers/AppServiceProvider.php
++++ b/app/Providers/AppServiceProvider.php
+@@ -39,6 +39,20 @@ public function boot(): void
+                 true
+             );
+         });
++
++        // Kepala sekolah: hanya melihat (monitoring) dashboard, data, dan laporan.
++        Gate::define('kepala-sekolah', function (User $user) {
++            return in_array(
++                (string) $user->id,
++                config('access.kepala_sekolah_user_ids', []),
++                true
++            );
++        });
++
++        // Halaman monitoring dapat dibuka admin maupun kepala sekolah.
++        Gate::define('view-monitoring', function (User $user) {
++            return Gate::forUser($user)->any(['access-admin', 'kepala-sekolah']);
++        });
+         $this->configureDefaults();
+     }
+ 
+diff --git a/config/access.php b/config/access.php
+index 01b4f51..6544a61 100644
+--- a/config/access.php
++++ b/config/access.php
+@@ -1,11 +1,14 @@
+ <?php
+ 
++$parseIds = fn (string $value): array => array_values(array_filter(
++    array_map('trim', explode(',', $value)),
++    fn ($id) => $id !== ''
++));
++
+ return [
+-    'admin_user_ids' => array_values(array_filter(
+-        array_map(
+-            'trim',
+-            explode(',', env('ADMIN_USER_IDS', ''))
+-        ),
+-        fn ($id) => $id !== ''
+-    )),
+-];
+\ No newline at end of file
++    // Akses penuh: kelola seluruh data.
++    'admin_user_ids' => $parseIds((string) env('ADMIN_USER_IDS', '')),
++
++    // Akses monitoring (hanya lihat): dashboard, data, dan laporan.
++    'kepala_sekolah_user_ids' => $parseIds((string) env('KEPALA_SEKOLAH_USER_IDS', '')),
++];
+diff --git a/database/seeders/DatabaseSeeder.php b/database/seeders/DatabaseSeeder.php
+index c549327..9b74b5c 100644
+--- a/database/seeders/DatabaseSeeder.php
++++ b/database/seeders/DatabaseSeeder.php
+@@ -18,6 +18,7 @@ public function run(): void
+         // User::factory(10)->create();
+ 
+         $this->call(AdminUserSeeder::class);
++        $this->call(KepalaSekolahSeeder::class);
+ 
+         User::factory()->create([
+             'name' => 'Test User',
+diff --git a/database/seeders/KepalaSekolahSeeder.php b/database/seeders/KepalaSekolahSeeder.php
+new file mode 100644
+index 0000000..1a96b74
+--- /dev/null
++++ b/database/seeders/KepalaSekolahSeeder.php
+@@ -0,0 +1,71 @@
++<?php
++
++namespace Database\Seeders;
++
++use App\Models\User;
++use Illuminate\Database\Console\Seeds\WithoutModelEvents;
++use Illuminate\Database\Seeder;
++use Illuminate\Support\Str;
++
++/**
++ * Membuat (atau memperbarui) akun Kepala Sekolah untuk monitoring.
++ *
++ * Kepala sekolah dapat melihat dashboard, data akademik, data PPDB,
++ * dan mengunduh laporan PDF, tetapi tidak dapat mengubah data.
++ *
++ * Kredensial dibaca dari environment agar tidak tersimpan di repository:
++ *   KEPALA_SEKOLAH_NAME, KEPALA_SEKOLAH_EMAIL, KEPALA_SEKOLAH_PASSWORD
++ * Jika password tidak diisi, password acak dibuat dan ditampilkan sekali.
++ */
++class KepalaSekolahSeeder extends Seeder
++{
++    use WithoutModelEvents;
++
++    public function run(): void
++    {
++        $email = env('KEPALA_SEKOLAH_EMAIL', 'kepsek@example.com');
++        $password = env('KEPALA_SEKOLAH_PASSWORD') ?: Str::password(14);
++
++        $user = User::firstOrNew(['email' => $email]);
++        $user->forceFill([
++            'name' => env('KEPALA_SEKOLAH_NAME', 'Kepala Sekolah'),
++            'password' => $password,
++            'email_verified_at' => now(),
++            'two_factor_secret' => null,
++            'two_factor_recovery_codes' => null,
++            'two_factor_confirmed_at' => null,
++        ])->save();
++
++        $this->grantMonitoringAccess($user);
++
++        $this->command?->info("Akun kepala sekolah: {$user->email} / {$password}");
++        $this->command?->warn('Jalankan "php artisan config:clear" bila config di-cache.');
++    }
++
++    private function grantMonitoringAccess(User $user): void
++    {
++        $ids = config('access.kepala_sekolah_user_ids', []);
++        $ids[] = (string) $user->id;
++        $ids = array_values(array_unique($ids));
++
++        config(['access.kepala_sekolah_user_ids' => $ids]);
++
++        $path = base_path('.env');
++
++        // Saat testing, jangan mengubah file .env milik developer.
++        if (app()->runningUnitTests() || ! is_file($path)) {
++            return;
++        }
++
++        $contents = file_get_contents($path);
++        $line = 'KEPALA_SEKOLAH_USER_IDS='.implode(',', $ids);
++
++        if (preg_match('/^KEPALA_SEKOLAH_USER_IDS=.*$/m', $contents)) {
++            $contents = preg_replace('/^KEPALA_SEKOLAH_USER_IDS=.*$/m', $line, $contents);
++        } else {
++            $contents = rtrim($contents).PHP_EOL.$line.PHP_EOL;
++        }
++
++        file_put_contents($path, $contents);
++    }
++}
+diff --git a/resources/js/components/app-sidebar.tsx b/resources/js/components/app-sidebar.tsx
+index 4f04be6..5c01c4a 100644
+--- a/resources/js/components/app-sidebar.tsx
++++ b/resources/js/components/app-sidebar.tsx
+@@ -71,14 +71,19 @@ export function AppSidebar() {
+         can: {
+             access_admin: boolean;
+             manage_users: boolean;
++            view_monitoring: boolean;
++            kepala_sekolah: boolean;
+         };
+     }>().props;
+ 
++    // Kepala sekolah: menu monitoring saja (tanpa Pengelolaan Konten).
+     const visibleNavItems = can.access_admin
+         ? mainNavItems
+-        : mainNavItems.filter(
+-            (item) => item.href === '/admin/konten/repository'
+-        );
++        : can.view_monitoring
++            ? mainNavItems.filter((item) => item.title !== 'Pengelolaan Konten')
++            : mainNavItems.filter(
++                (item) => item.href === '/admin/konten/repository'
++            );
+ 
+     return (
+         <Sidebar collapsible="icon" variant="inset">
+@@ -88,7 +93,7 @@ export function AppSidebar() {
+                         <SidebarMenuButton size="lg" asChild className='h-14 group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:p-1!' >
+                             <Link
+                                 href={
+-                                    can.access_admin
++                                    can.view_monitoring
+                                         ? '/admin/dashboard'
+                                         : '/admin/konten/repository'
+                                 }
+diff --git a/resources/js/pages/admin/dashboard.tsx b/resources/js/pages/admin/dashboard.tsx
+index 01e0806..aee664e 100644
+--- a/resources/js/pages/admin/dashboard.tsx
++++ b/resources/js/pages/admin/dashboard.tsx
+@@ -1,4 +1,4 @@
+-import { Head, Link, router } from '@inertiajs/react';
++import { Head, Link, router, usePage } from '@inertiajs/react';
+ import {
+     BookOpen,
+     ClipboardList,
+@@ -72,6 +72,8 @@ export default function Dashboard({
+     siswaTanpaKelas,
+ }: Props) {
+     const [loadingFilter, setLoadingFilter] = useState(false);
++    const { can } = usePage<{ can?: { access_admin?: boolean } }>().props;
++    const isAdmin = Boolean(can?.access_admin);
+ 
+     const namaPeriode =
+         periode.find((item) => item.id === periodeTerpilih)?.nama_periode
+@@ -142,7 +144,7 @@ export default function Dashboard({
+ 
+     return (
+         <>
+-            <Head title="Dashboard Admin" />
++            <Head title={isAdmin ? 'Dashboard Admin' : 'Dashboard Kepala Sekolah'} />
+ 
+             <main className="flex flex-col gap-6 p-4 md:p-6">
+                 {/* Header */}
+@@ -355,7 +357,7 @@ export default function Dashboard({
+                             href="/admin/ppdbadmin"
+                             className="text-sm font-medium text-blue-700 hover:underline"
+                         >
+-                            Kelola PPDB →
++                            {isAdmin ? 'Kelola PPDB →' : 'Lihat PPDB →'}
+                         </Link>
+                     </div>
+ 
+diff --git a/resources/js/pages/admin/data-table-page.tsx b/resources/js/pages/admin/data-table-page.tsx
+index 9c42d14..a0518c8 100644
+--- a/resources/js/pages/admin/data-table-page.tsx
++++ b/resources/js/pages/admin/data-table-page.tsx
+@@ -1,4 +1,4 @@
+-import { Head } from '@inertiajs/react';
++import { Head, usePage } from '@inertiajs/react';
+ import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+ import { useState, type ReactNode } from 'react';
+ 
+@@ -53,6 +53,11 @@ export default function DataTablePage({
+     const [search, setSearch] = useState('');
+     const q = search.toLowerCase();
+ 
++    // Kepala sekolah hanya memantau: tombol tambah/edit/hapus disembunyikan.
++    const { can } = usePage<{ can?: { access_admin?: boolean; kepala_sekolah?: boolean } }>().props;
++    const readOnly = Boolean(can?.kepala_sekolah && !can?.access_admin);
++    const totalKolom = columns.length + (readOnly ? 1 : 2);
++
+     const filtered = rows.filter((row) =>
+         columns
+             .filter((col) => col.searchable !== false)
+@@ -70,7 +75,7 @@ export default function DataTablePage({
+                         <h1 className="text-2xl font-bold">{title}</h1>
+                         {description && <p className="text-sm text-muted-foreground">{description}</p>}
+                     </div>
+-                    {addLabel && (
++                    {addLabel && !readOnly && (
+                         <button
+                             onClick={onAdd ?? (() => alert(`Form "${addLabel}" belum dibuat`))}
+                             className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+@@ -103,14 +108,14 @@ export default function DataTablePage({
+                                 {columns.map((col) => (
+                                     <th key={col.key} className="p-3 font-semibold">{col.label}</th>
+                                 ))}
+-                                <th className="p-3 text-right">Aksi</th>
++                                {!readOnly && <th className="p-3 text-right">Aksi</th>}
+                             </tr>
+                         </thead>
+                         <tbody>
+                             {loading ? (
+-                                <tr><td colSpan={columns.length + 2} className="p-6 text-center text-muted-foreground">Memuat data...</td></tr>
++                                <tr><td colSpan={totalKolom} className="p-6 text-center text-muted-foreground">Memuat data...</td></tr>
+                             ) : filtered.length === 0 ? (
+-                                <tr><td colSpan={columns.length + 2} className="p-6 text-center text-muted-foreground">Tidak ada data.</td></tr>
++                                <tr><td colSpan={totalKolom} className="p-6 text-center text-muted-foreground">Tidak ada data.</td></tr>
+                             ) : (
+                                 filtered.map((row, i) => (
+                                     <tr key={row.id ?? i} className="border-t hover:bg-muted/30">
+@@ -120,7 +125,7 @@ export default function DataTablePage({
+                                                 {col.render ? col.render(row) : (get(row, col.key) ?? '-')}
+                                             </td>
+                                         ))}
+-                                        <td className="p-3">
++                                        {!readOnly && <td className="p-3">
+                                             <div className="flex justify-end gap-1">
+                                                 {actions ? actions(row) : (
+                                                     <>
+@@ -133,7 +138,7 @@ export default function DataTablePage({
+                                                     </>
+                                                 )}
+                                             </div>
+-                                        </td>
++                                        </td>}
+                                     </tr>
+                                 ))
+                             )}
+diff --git a/routes/web.php b/routes/web.php
+index d5eb8cc..a298b3b 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -125,7 +125,7 @@
+ 
+ Route::get('/dashboard', function (Request $request) {
+     return redirect(
+-        $request->user()->can('access-admin')
++        $request->user()->can('view-monitoring')
+             ? '/admin/dashboard'
+             : '/admin/konten/repository'
+     );
+@@ -181,11 +181,13 @@
+ 
+ /*
+ |--------------------------------------------------------------------------
+-| Halaman Dashboard dan Pengelolaan Khusus Admin
++| Halaman Monitoring: Admin dan Kepala Sekolah
+ |--------------------------------------------------------------------------
++| Kepala sekolah hanya dapat melihat. Seluruh perubahan data tetap
++| dijaga oleh endpoint JSON khusus admin di bawah.
+ */
+ 
+-Route::middleware(['auth', 'verified', 'can:access-admin'])
++Route::middleware(['auth', 'verified', 'can:view-monitoring'])
+     ->prefix('admin')
+     ->name('admin.')
+     ->group(function () {
+@@ -232,7 +234,18 @@
+ 
+         Route::inertia('periode-ppdb', 'admin/periode-ppdb')
+             ->name('periode-ppdb');
++    });
++
++/*
++|--------------------------------------------------------------------------
++| Halaman Pengelolaan Konten: Khusus Admin
++|--------------------------------------------------------------------------
++*/
+ 
++Route::middleware(['auth', 'verified', 'can:access-admin'])
++    ->prefix('admin')
++    ->name('admin.')
++    ->group(function () {
+         // Konten selain repository.
+         Route::prefix('konten')->name('konten.')->group(function () {
+             Route::inertia('pengumuman', 'admin/pengumuman')
+@@ -246,6 +259,46 @@
+             ->name('galeri');
+     });
+ 
++/*
++|--------------------------------------------------------------------------
++| Endpoint JSON Baca-Saja: Admin dan Kepala Sekolah
++|--------------------------------------------------------------------------
++| Dipakai halaman monitoring dan laporan. Tidak ada endpoint tulis di sini.
++*/
++
++Route::middleware(['auth', 'can:view-monitoring'])
++    ->prefix('api')
++    ->group(function () {
++        Route::apiResource('siswa', SiswaController::class)
++            ->parameters(['siswa' => 'siswa'])
++            ->only(['index', 'show']);
++
++        Route::apiResource('guru', GuruController::class)
++            ->parameters(['guru' => 'guru'])
++            ->only(['index', 'show']);
++
++        Route::apiResource('kelas', KelasController::class)
++            ->parameters(['kelas' => 'kelas'])
++            ->only(['index', 'show']);
++
++        Route::get('ppdb', [
++            PpdbController::class,
++            'list',
++        ]);
++
++        Route::get('ppdb/{ppdb}', [
++            PpdbController::class,
++            'show',
++        ]);
++
++        Route::apiResource(
++            'periode-ppdb',
++            PeriodePpdbController::class
++        )
++            ->parameters(['periode-ppdb' => 'periodePpdb'])
++            ->only(['index', 'show']);
++    });
++
+ /*
+ |--------------------------------------------------------------------------
+ | Endpoint JSON Khusus Admin
+@@ -258,13 +311,16 @@
+     ->group(function () {
+         // Akademik.
+         Route::apiResource('siswa', SiswaController::class)
+-            ->parameters(['siswa' => 'siswa']);
++            ->parameters(['siswa' => 'siswa'])
++            ->except(['index', 'show']);
+ 
+         Route::apiResource('guru', GuruController::class)
+-            ->parameters(['guru' => 'guru']);
++            ->parameters(['guru' => 'guru'])
++            ->except(['index', 'show']);
+ 
+         Route::apiResource('kelas', KelasController::class)
+-            ->parameters(['kelas' => 'kelas']);
++            ->parameters(['kelas' => 'kelas'])
++            ->except(['index', 'show']);
+ 
+         // Index mapel sudah tersedia untuk semua akun login.
+         // Perubahannya hanya boleh dilakukan admin.
+@@ -276,16 +332,6 @@
+             ->only(['store', 'update', 'destroy']);
+ 
+         // Pengelolaan PPDB, bukan pendaftaran publik.
+-        Route::get('ppdb', [
+-            PpdbController::class,
+-            'list',
+-        ]);
+-
+-        Route::get('ppdb/{ppdb}', [
+-            PpdbController::class,
+-            'show',
+-        ]);
+-
+         Route::put('ppdb/{ppdb}', [
+             PpdbController::class,
+             'update',
+@@ -309,7 +355,9 @@
+         Route::apiResource(
+             'periode-ppdb',
+             PeriodePpdbController::class
+-        )->parameters(['periode-ppdb' => 'periodePpdb']);
++        )
++            ->parameters(['periode-ppdb' => 'periodePpdb'])
++            ->except(['index', 'show']);
+ 
+         // Pengumuman.
+         Route::apiResource(
+diff --git a/tests/Feature/KepalaSekolahAccessTest.php b/tests/Feature/KepalaSekolahAccessTest.php
+new file mode 100644
+index 0000000..d602b1f
+--- /dev/null
++++ b/tests/Feature/KepalaSekolahAccessTest.php
+@@ -0,0 +1,141 @@
++<?php
++
++use App\Models\User;
++use Database\Seeders\KepalaSekolahSeeder;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Hash;
++use Tests\TestCase;
++
++uses(TestCase::class, RefreshDatabase::class);
++
++function kepalaSekolah(): User
++{
++    $user = User::factory()->create();
++    config([
++        'access.admin_user_ids' => [],
++        'access.kepala_sekolah_user_ids' => [(string) $user->id],
++    ]);
++
++    return $user;
++}
++
++it('creates a verified kepala sekolah account from the seeder', function () {
++    putenv('KEPALA_SEKOLAH_EMAIL=kepsek@sekolah.test');
++    putenv('KEPALA_SEKOLAH_PASSWORD=RahasiaKepsek#2026');
++    config(['access.admin_user_ids' => [], 'access.kepala_sekolah_user_ids' => []]);
++
++    $this->seed(KepalaSekolahSeeder::class);
++
++    $user = User::where('email', 'kepsek@sekolah.test')->firstOrFail();
++
++    expect($user->email_verified_at)->not->toBeNull()
++        ->and(Hash::check('RahasiaKepsek#2026', $user->password))->toBeTrue()
++        ->and(config('access.kepala_sekolah_user_ids'))->toContain((string) $user->id)
++        ->and($user->can('view-monitoring'))->toBeTrue()
++        ->and($user->can('access-admin'))->toBeFalse();
++
++    // Menjalankan ulang tidak membuat akun ganda.
++    $this->seed(KepalaSekolahSeeder::class);
++    expect(User::where('email', 'kepsek@sekolah.test')->count())->toBe(1);
++
++    putenv('KEPALA_SEKOLAH_EMAIL');
++    putenv('KEPALA_SEKOLAH_PASSWORD');
++});
++
++it('lets kepala sekolah open the monitoring pages', function (string $url) {
++    $this->actingAs(kepalaSekolah())->get($url)->assertOk();
++})->with([
++    '/admin/dashboard',
++    '/admin/laporan',
++    '/admin/siswa',
++    '/admin/guru',
++    '/admin/kelas',
++    '/admin/mata-pelajaran',
++    '/admin/ppdbadmin',
++    '/admin/periode-ppdb',
++]);
++
++it('redirects kepala sekolah to the dashboard after login', function () {
++    $this->actingAs(kepalaSekolah())
++        ->get('/dashboard')
++        ->assertRedirect('/admin/dashboard');
++});
++
++it('lets kepala sekolah read monitoring data', function (string $url) {
++    $this->actingAs(kepalaSekolah())->getJson($url)->assertOk();
++})->with([
++    '/api/siswa',
++    '/api/guru',
++    '/api/kelas',
++    '/api/ppdb',
++    '/api/periode-ppdb',
++]);
++
++it('blocks kepala sekolah from changing data', function (string $method, string $url) {
++    // Record nyata dibuat agar yang diuji adalah izin, bukan 404 karena data tidak ada.
++    $orang = [
++        'jenis_kelamin' => 'L',
++        'tempat_lahir' => 'Solo',
++        'tanggal_lahir' => '2012-01-01',
++        'no_hp' => '0800000000',
++        'alamat' => 'Alamat',
++        'created_at' => now(),
++        'updated_at' => now(),
++    ];
++    DB::table('data_ppdb')->insert($orang + ['id' => 1, 'nama_lengkap' => 'Pendaftar',
++        'nisn' => '1111111111', 'asal_sekolah' => 'SD', 'nama_orang_tua' => 'Ortu']);
++    DB::table('siswa')->insert($orang + ['id' => 1, 'nis' => '001', 'nisn' => '2222222222',
++        'nama_lengkap' => 'Siswa', 'nama_orang_tua' => 'Ortu']);
++    DB::table('guru')->insert($orang + ['id' => 1, 'nama_lengkap' => 'Guru']);
++
++    $this->actingAs(kepalaSekolah())->json($method, $url, [])->assertForbidden();
++
++    expect(DB::table('data_ppdb')->value('status'))->toBe('menunggu')
++        ->and(DB::table('siswa')->count())->toBe(1)
++        ->and(DB::table('guru')->count())->toBe(1);
++})->with([
++    ['POST', '/api/siswa'],
++    ['PUT', '/api/siswa/1'],
++    ['DELETE', '/api/siswa/1'],
++    ['POST', '/api/guru'],
++    ['DELETE', '/api/guru/1'],
++    ['POST', '/api/kelas'],
++    ['POST', '/api/mata-pelajaran'],
++    ['PUT', '/api/ppdb/1'],
++    ['POST', '/api/ppdb/1/terima'],
++    ['DELETE', '/api/ppdb/1'],
++    ['POST', '/api/periode-ppdb'],
++    ['POST', '/api/pengumuman'],
++    ['POST', '/api/galeri'],
++    ['PUT', '/api/repository/kode-akses'],
++]);
++
++it('keeps content management and account creation admin-only', function (string $url) {
++    $this->actingAs(kepalaSekolah())->get($url)->assertForbidden();
++})->with([
++    '/admin/konten/pengumuman',
++    '/admin/konten/galeri',
++    '/admin/pengguna/tambah',
++]);
++
++it('still blocks regular guru accounts from monitoring', function (string $url) {
++    $guru = User::factory()->create();
++    config(['access.admin_user_ids' => [], 'access.kepala_sekolah_user_ids' => []]);
++
++    $this->actingAs($guru)->get($url)->assertForbidden();
++})->with([
++    '/admin/dashboard',
++    '/admin/laporan',
++    '/api/siswa',
++]);
++
++it('keeps full access for admin', function () {
++    $admin = User::factory()->create();
++    config(['access.admin_user_ids' => [(string) $admin->id]]);
++
++    $this->actingAs($admin)->get('/admin/dashboard')->assertOk();
++    $this->actingAs($admin)->get('/admin/konten/pengumuman')->assertOk();
++    $this->actingAs($admin)->getJson('/api/siswa')->assertOk();
++    $this->actingAs($admin)->postJson('/api/kelas', [])->assertUnprocessable();
++});
+-- 
+2.47.1.windows.1
+
