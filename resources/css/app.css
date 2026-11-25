@@ -132,6 +132,26 @@
     --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* Kunci tema light di HP / perangkat mobile */
+@media (max-width: 768px) {
+    :root, .dark {
+        --background: oklch(1 0 0) !important;
+        --foreground: oklch(0.145 0 0) !important;
+        --card: oklch(1 0 0) !important;
+        --card-foreground: oklch(0.145 0 0) !important;
+        --popover: oklch(1 0 0) !important;
+        --popover-foreground: oklch(0.145 0 0) !important;
+        --muted: oklch(0.97 0 0) !important;
+        --muted-foreground: oklch(0.556 0 0) !important;
+        --accent: oklch(0.97 0 0) !important;
+        --accent-foreground: oklch(0.205 0 0) !important;
+        --border: oklch(0.922 0 0) !important;
+        --input: oklch(0.922 0 0) !important;
+        --sidebar: oklch(0.985 0 0) !important;
+        --sidebar-foreground: oklch(0.145 0 0) !important;
+    }
+}
+
 @layer base {
     * {
         @apply border-border;

@@ -16,7 +16,13 @@ class HandleAppearance
      */
     public function handle(Request $request, Closure $next): Response
     {
-        View::share('appearance', $request->cookie('appearance') ?? 'system');
+        $userAgent = $request->userAgent() ?? '';
+        $isMobile = (bool) preg_match('/(android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini)/i', $userAgent);
+
+        $appearance = $isMobile ? 'light' : ($request->cookie('appearance') ?? 'light');
+
+        View::share('appearance', $appearance);
+        View::share('isMobile', $isMobile);
 
         return $next($request);
     }

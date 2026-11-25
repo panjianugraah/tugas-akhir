@@ -1,5 +1,3 @@
-import { Head, Link, usePage } from '@inertiajs/react';
-import { MapPin } from 'lucide-react';
 import HeroCarousel from '../pages/HeroCarousel';
 import About from './about';
 import VisionMission from '../pages/visionmission';
@@ -7,10 +5,7 @@ import Programs from '../pages/programs';
 import Gallery from './gallery';
 import Navbar from '../pages/navbar';
 
-
 export default function Welcome() {
-    const { auth } = usePage().props;
-
     return (
         <>
             <Navbar />

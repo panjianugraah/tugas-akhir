@@ -1,6 +1,7 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import type { User } from '@/types';
 import logo from '../../../storage/app/public/smp.jpg';
 
 const sectionMenus = [
@@ -25,6 +26,8 @@ const mobileLinkClass =
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const { auth } = usePage<{ auth?: { user?: User | null } }>().props;
+    const user = auth?.user;
 
     const closeMenu = () => setIsOpen(false);
 
@@ -79,15 +82,25 @@ export default function Navbar() {
                         ))}
                     </div>
 
-                    {/* Login dan tombol menu mobile */}
+                    {/* Login / Dashboard dan tombol menu mobile */}
                     <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                        <Link
-                            href="/login"
-                            onClick={closeMenu}
-                            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:px-5"
-                        >
-                            Login
-                        </Link>
+                        {user ? (
+                            <Link
+                                href="/dashboard"
+                                onClick={closeMenu}
+                                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:px-5"
+                            >
+                                Dashboard
+                            </Link>
+                        ) : (
+                            <Link
+                                href="/login"
+                                onClick={closeMenu}
+                                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:px-5"
+                            >
+                                Login
+                            </Link>
+                        )}
 
                         <button
                             type="button"
@@ -138,6 +151,26 @@ export default function Navbar() {
                                 {menu.label}
                             </Link>
                         ))}
+
+                        <div className="pt-2">
+                            {user ? (
+                                <Link
+                                    href="/dashboard"
+                                    onClick={closeMenu}
+                                    className="block rounded-lg bg-blue-50 px-3 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                                >
+                                    Dashboard
+                                </Link>
+                            ) : (
+                                <Link
+                                    href="/login"
+                                    onClick={closeMenu}
+                                    className="block rounded-lg bg-blue-50 px-3 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                                >
+                                    Login
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 )}
             </nav>

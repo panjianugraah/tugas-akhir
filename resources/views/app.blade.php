@@ -1,15 +1,27 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['light' => ($appearance ?? 'system') == 'light'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => empty($isMobile) && ($appearance ?? 'light') == 'dark'])>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
-        <!-- <script>
+        <script>
             (function() {
-                const appearance = '{{ $appearance ?? "system" }}';
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                    || window.matchMedia('(max-width: 768px)').matches
+                    || (window.innerWidth <= 768);
 
-                if (appearance === 'system') {
+                if (isMobile) {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.style.colorScheme = 'light';
+                    return;
+                }
+
+                const appearance = '{{ $appearance ?? "light" }}';
+
+                if (appearance === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else if (appearance === 'system') {
                     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
                     if (prefersDark) {
@@ -17,7 +29,7 @@
                     }
                 }
             })();
-        </script> -->
+        </script>
 
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
         <style>
@@ -27,6 +39,13 @@
 
             html.dark {
                 background-color: oklch(0.145 0 0);
+            }
+
+            @media (max-width: 768px) {
+                html, html.dark {
+                    background-color: oklch(1 0 0) !important;
+                    color-scheme: light !important;
+                }
             }
         </style>
 

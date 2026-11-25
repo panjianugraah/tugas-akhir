@@ -1,28 +1,32 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
+import { ArrowLeft } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { register } from '@/routes';
 import { store } from '@/routes/login';
-import { request } from '@/routes/password';
-import PasskeyVerify from '@/components/passkey-verify';
 
 type Props = {
     status?: string;
-    canResetPassword: boolean;
+    canResetPassword?: boolean;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({ status }: Props) {
     return (
         <>
             <Head title="Masuk" />
 
-            {/* <PasskeyVerify /> */}
+            <div className="mb-2">
+                <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition-colors hover:text-blue-700"
+                >
+                    <ArrowLeft className="size-4" />
+                    Kembali ke Beranda
+                </Link>
+            </div>
 
             <Form
                 {...store.form()}
@@ -48,18 +52,7 @@ export default function Login({ status, canResetPassword }: Props) {
                             </div>
 
                             <div className="grid gap-2">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Kata sandi</Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="ml-auto text-sm"
-                                            tabIndex={5}
-                                        >
-                                            Lupa kata sandi?
-                                        </TextLink>
-                                    )}
-                                </div>
+                                <Label htmlFor="password">Kata sandi</Label>
                                 <PasswordInput
                                     id="password"
                                     name="password"
@@ -71,24 +64,27 @@ export default function Login({ status, canResetPassword }: Props) {
                                 <InputError message={errors.password} />
                             </div>
 
-                            <div className="flex items-center space-x-3">
-                                <Checkbox
-                                    id="remember"
-                                    name="remember"
-                                    tabIndex={3}
-                                />
-                                <Label htmlFor="remember">Ingat saya</Label>
-                            </div>
-
                             <Button
                                 type="submit"
-                                className="mt-4 w-full bg-blue-700"
-                                tabIndex={4}
+                                className="mt-2 w-full bg-blue-700 hover:bg-blue-800"
+                                tabIndex={3}
                                 disabled={processing}
                                 data-test="login-button"
                             >
                                 {processing && <Spinner />}
                                 Masuk
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                                asChild
+                            >
+                                <Link href="/">
+                                    <ArrowLeft className="mr-2 size-4" />
+                                    Kembali ke Beranda
+                                </Link>
                             </Button>
                         </div>
                     </>
@@ -105,6 +101,6 @@ export default function Login({ status, canResetPassword }: Props) {
 }
 
 Login.layout = {
-    title: 'Log in to your account',
-    description: 'Enter your email and password below to log in',
+    title: 'Masuk ke Akun Anda',
+    description: 'Masukkan email dan kata sandi Anda untuk melanjutkan',
 };

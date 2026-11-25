@@ -10,7 +10,21 @@ export type UseAppearanceReturn = {
 };
 
 const listeners = new Set<() => void>();
-let currentAppearance: Appearance = 'system';
+let currentAppearance: Appearance = 'light';
+
+export const isMobileDevice = (): boolean => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent,
+        ) ||
+        window.matchMedia('(max-width: 768px)').matches ||
+        window.innerWidth <= 768
+    );
+};
 
 const prefersDark = (): boolean => {
     if (typeof window === 'undefined') {
@@ -31,18 +45,28 @@ const setCookie = (name: string, value: string, days = 365): void => {
 
 const getStoredAppearance = (): Appearance => {
     if (typeof window === 'undefined') {
-        return 'system';
+        return 'light';
     }
 
-    return (localStorage.getItem('appearance') as Appearance) || 'system';
+    return (localStorage.getItem('appearance') as Appearance) || 'light';
 };
 
 const isDarkMode = (appearance: Appearance): boolean => {
+    if (isMobileDevice()) {
+        return false;
+    }
+
     return appearance === 'dark' || (appearance === 'system' && prefersDark());
 };
 
 const applyTheme = (appearance: Appearance): void => {
     if (typeof document === 'undefined') {
+        return;
+    }
+
+    if (isMobileDevice()) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.style.colorScheme = 'light';
         return;
     }
 
@@ -75,9 +99,14 @@ export function initializeTheme(): void {
         return;
     }
 
+    if (isMobileDevice()) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.style.colorScheme = 'light';
+    }
+
     if (!localStorage.getItem('appearance')) {
-        localStorage.setItem('appearance', 'system');
-        setCookie('appearance', 'system');
+        localStorage.setItem('appearance', 'light');
+        setCookie('appearance', 'light');
     }
 
     currentAppearance = getStoredAppearance();
@@ -85,13 +114,18 @@ export function initializeTheme(): void {
 
     // Set up system theme change listener
     mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+
+    // Set up resize listener to lock theme when switching to mobile breakpoint
+    window.addEventListener('resize', () => {
+        applyTheme(currentAppearance);
+    });
 }
 
 export function useAppearance(): UseAppearanceReturn {
     const appearance: Appearance = useSyncExternalStore(
         subscribe,
         () => currentAppearance,
-        () => 'system',
+        () => 'light',
     );
 
     const resolvedAppearance: ResolvedAppearance = isDarkMode(appearance)
@@ -99,6 +133,13 @@ export function useAppearance(): UseAppearanceReturn {
         : 'light';
 
     const updateAppearance = (mode: Appearance): void => {
+        if (isMobileDevice()) {
+            currentAppearance = 'light';
+            applyTheme('light');
+            notify();
+            return;
+        }
+
         currentAppearance = mode;
 
         // Store in localStorage for client-side persistence...
